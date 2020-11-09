@@ -283,7 +283,7 @@ def prepare_optimizee(optimizee, path):
     :param path: The path to store the optimizee.
     """
     # Serialize optimizee object so each process can run simulate on it independently on the CNs
-    fname = os.path.join(path, "optimizee.bin")
+    fname = os.path.join(path, "/LTL-PSE-MULTI-GD/run-no-test/simulation/optimizee.bin")
     f = open(fname, "wb")
     pickle.dump(optimizee, f)
     f.close()

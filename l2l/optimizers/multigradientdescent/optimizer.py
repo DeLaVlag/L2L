@@ -7,13 +7,14 @@ import numpy as np
 from l2l import dict_to_list
 from l2l import list_to_dict
 from l2l.optimizers.optimizer import Optimizer
+from l2l import get_grouped_dict
 
 logger = logging.getLogger("optimizers.gradientdescent")
 
-ClassicGDParameters = namedtuple(
+MultiClassicGDParameters = namedtuple(
     'ClassicGDParameters',
     ['learning_rate', 'exploration_step_size', 'n_random_steps', 'n_iteration', 'stop_criterion', 'seed'])
-ClassicGDParameters.__doc__ = """
+MultiClassicGDParameters.__doc__ = """
 :param learning_rate: The rate of learning per step of gradient descent
 :param exploration_step_size: The standard deviation of random steps used for finite difference gradient
 :param n_random_steps: The amount of random steps used to estimate gradient
@@ -21,11 +22,11 @@ ClassicGDParameters.__doc__ = """
 :param stop_criterion: Stop if change in fitness is below this value
 """
 
-StochasticGDParameters = namedtuple(
+MultiStochasticGDParameters = namedtuple(
     'StochasticGDParameters',
     ['learning_rate', 'stochastic_deviation', 'stochastic_decay', 'exploration_step_size', 'n_random_steps', 'n_iteration',
      'stop_criterion', 'seed'])
-StochasticGDParameters.__doc__ = """
+MultiStochasticGDParameters.__doc__ = """
 :param learning_rate: The rate of learning per step of gradient descent
 :param stochastic_deviation: The standard deviation of the random vector used to perturbate the gradient
 :param stochastic_decay: The decay of the influence of the random vector that is added to the gradient 
@@ -36,11 +37,11 @@ StochasticGDParameters.__doc__ = """
 :param stop_criterion: Stop if change in fitness is below this value
 """
 
-AdamParameters = namedtuple(
+MultiAdamParameters = namedtuple(
     'AdamParameters',
     ['learning_rate', 'exploration_step_size', 'n_random_steps', 'first_order_decay', 'second_order_decay', 'n_iteration',
      'stop_criterion', 'seed'])
-AdamParameters.__doc__ = """
+MultiAdamParameters.__doc__ = """
 :param learning_rate: The rate of learning per step of gradient descent
 :param exploration_step_size: The standard deviation of random steps used for finite difference gradient
 :param n_random_steps: The amount of random steps used to estimate gradient
@@ -51,10 +52,10 @@ AdamParameters.__doc__ = """
 
 """
 
-RMSPropParameters = namedtuple(
+MultiRMSPropParameters = namedtuple(
     'RMSPropParameters',
-    ['learning_rate', 'exploration_step_size', 'n_random_steps', 'momentum_decay', 'n_iteration', 'stop_criterion', 'seed'])
-RMSPropParameters.__doc__ = """
+    ['learning_rate', 'exploration_step_size', 'n_random_steps', 'momentum_decay', 'n_iteration', 'stop_criterion', 'seed', 'n_inner_params'])
+MultiRMSPropParameters.__doc__ = """
 :param learning_rate: The rate of learning per step of gradient descent
 :param exploration_step_size: The standard deviation of random steps used for finite difference gradient
 :param n_random_steps: The amount of random steps used to estimate gradient
@@ -65,7 +66,7 @@ RMSPropParameters.__doc__ = """
 """
 
 
-class GradientDescentOptimizer(Optimizer):
+class MultiGradientDescentOptimizer(Optimizer):
     """
     Class for a generic gradient descent solver.
     In the pseudo code the algorithm does:
@@ -78,8 +79,8 @@ class GradientDescentOptimizer(Optimizer):
 
     NOTE: This expects all parameters of the system to be of floating point
 
-    :param  ~l2l.utils.trajectory.Trajectory traj:
-      Use this trajectory to store the parameters of the specific runs. The parameters should be
+    :param  ~pypet.trajectory.Trajectory traj:
+      Use this pypet trajectory to store the parameters of the specific runs. The parameters should be
       initialized based on the values in `parameters`
     
     :param optimizee_create_individual:
@@ -96,6 +97,10 @@ class GradientDescentOptimizer(Optimizer):
       :func:`~collections.namedtuple` :class:`.AdamParameters` containing the
       parameters needed by the Optimizer. The type of this parameter is used to select one of the GD variants.
     
+    :param optimizee_bounding_func:
+      This is a function that takes an individual as argument and returns another individual that is
+      within bounds (The bounds are defined by the function itself). If not provided, the individuals
+      are not bounded.
     """
 
     def __init__(self, traj,
@@ -107,6 +112,7 @@ class GradientDescentOptimizer(Optimizer):
                          optimizee_create_individual=optimizee_create_individual,
                          optimizee_fitness_weights=optimizee_fitness_weights,
                          parameters=parameters, optimizee_bounding_func=optimizee_bounding_func)
+        self.recorder_parameters = parameters
         self.optimizee_bounding_func = optimizee_bounding_func
         
         traj.f_add_parameter('learning_rate', parameters.learning_rate, comment='Value of learning rate')
@@ -115,6 +121,7 @@ class GradientDescentOptimizer(Optimizer):
         traj.f_add_parameter('n_random_steps', parameters.n_random_steps, 
                              comment='Amount of random steps taken for calculating the gradient')
         traj.f_add_parameter('n_iteration', parameters.n_iteration, comment='Number of iteration to perform')
+        traj.f_add_parameter('n_inner_params', parameters.n_inner_params, comment='Number of parameters internally explored per individual')
         traj.f_add_parameter('stop_criterion', parameters.stop_criterion, comment='Stopping criterion parameter')
         traj.f_add_parameter('seed', np.uint32(parameters.seed), comment='Optimizer random seed')
         
@@ -128,13 +135,13 @@ class GradientDescentOptimizer(Optimizer):
 
         # Depending on the algorithm used, initialize the necessary variables
         self.updateFunction = None
-        if type(parameters) is ClassicGDParameters:
+        if type(parameters) is MultiClassicGDParameters:
             self.init_classic_gd(parameters, traj)
-        elif type(parameters) is StochasticGDParameters:
+        elif type(parameters) is MultiStochasticGDParameters:
             self.init_stochastic_gd(parameters, traj)
-        elif type(parameters) is AdamParameters:
+        elif type(parameters) is MultiAdamParameters:
             self.init_adam(parameters, traj)
-        elif type(parameters) is RMSPropParameters:
+        elif type(parameters) is MultiRMSPropParameters:
             self.init_rmsprop(parameters, traj)
         else:
             raise Exception('Class of the provided "parameters" argument is not among the supported types')
@@ -149,8 +156,9 @@ class GradientDescentOptimizer(Optimizer):
             list_to_dict(self.current_individual + 
                          self.random_state.normal(0.0, parameters.exploration_step_size, self.current_individual.size),
                          self.optimizee_individual_dict_spec)
-            for i in range(parameters.n_random_steps)
+            for i in range((parameters.n_random_steps*traj.n_inner_params)-1)
         ]
+        print(new_individual_list)
 
         # Also add the current individual to determine it's fitness
         new_individual_list.append(list_to_dict(self.current_individual, self.optimizee_individual_dict_spec))
@@ -158,43 +166,76 @@ class GradientDescentOptimizer(Optimizer):
         if optimizee_bounding_func is not None:
             new_individual_list = [self.optimizee_bounding_func(ind) for ind in new_individual_list]
 
+        self.grouped_params_dict = get_grouped_dict(new_individual_list)
+
         # Storing the fitness of the current individual
         self.current_fitness = -np.Inf
         self.g = 0
-        
+        new_individual_list = self.compress_individual(new_individual_list, traj.n_inner_params)
         self.eval_pop = new_individual_list
         self._expand_trajectory(traj)
 
+    def get_params(self):
+        """
+        Get parameters used for recorder
+        :return: Dictionary containing recorder parameters
+        """
+        return self.recorder_parameters._asdict()
+
+    def expand_individual(self, c_population, inner_params):
+        individual_exp = [{} for i in range(len(c_population)*inner_params)]
+        for ind_id, elem in enumerate(c_population):
+            for key in self.grouped_params_dict.keys():
+                parameters = elem[key]
+                for ix, e in enumerate(parameters):
+                    individual_exp[ind_id*inner_params+ix][key] = float(e)
+        print(individual_exp)
+        return individual_exp
+
+    def compress_individual(self, e_population, inner_params):
+        e_population_reform = []
+        for s in range(int(len(e_population) / inner_params)):
+           tmp_dict = {}
+           for key in self.grouped_params_dict.keys():
+               tmp = []
+               for p in range(inner_params):
+                   tmp.append(e_population[s*inner_params + p][key])
+               tmp_dict[key] = tmp
+           e_population_reform.append(tmp_dict)
+        print(e_population_reform)
+        return e_population_reform
+
     def post_process(self, traj, fitnesses_results):
         """
-        See :meth:`~l2l.optimizers.optimizer.Optimizer.post_process`
+        See :meth:`~ltl.optimizers.optimizer.Optimizer.post_process`
         """
         old_eval_pop = self.eval_pop.copy()
+        old_eval_pop_expanded = self.expand_individual(old_eval_pop,traj.n_inner_params)
         self.eval_pop.clear()
 
         logger.info("  Evaluating %i individuals" % len(fitnesses_results))
         
-        assert len(fitnesses_results) - 1 == traj.n_random_steps
+        assert len(fitnesses_results) == traj.n_random_steps
 
         # We need to collect the directions of the random steps along with the fitness evaluated there
-        fitnesses = np.zeros((traj.n_random_steps))
-        dx = np.zeros((traj.n_random_steps, len(self.current_individual)))
+        fitnesses = np.zeros((traj.n_random_steps*traj.n_inner_params))
+        dx = np.zeros((traj.n_random_steps*traj.n_inner_params, 2))
         weighted_fitness_list = []
-
-        for i, (run_index, fitness) in enumerate(fitnesses_results):
+        fitnesses_results_exp = []
+        for (id, elem) in fitnesses_results:
+            for ix, e in enumerate(elem):
+                fitnesses_results_exp.append((ix, float(e)))
+        print(fitnesses_results_exp)
+        for i, (run_index, fitness) in enumerate(fitnesses_results_exp):
             # We need to convert the current run index into an ind_idx
             # (index of individual within one generation
             traj.v_idx = run_index
-            ind_index = traj.par.ind_idx
-        
-            individual = old_eval_pop[ind_index]
+            ind_index = i#traj.par.ind_idx
 
+            individual = old_eval_pop_expanded[i]
             traj.f_add_result('$set.$.individual', individual)
             traj.f_add_result('$set.$.fitness', fitness)
-
-            print('fitnessoptimizer', fitness)
-            print('optimizee_fitness_weights', self.optimizee_fitness_weights)
-
+            print(fitness)
             weighted_fitness = np.dot(fitness, self.optimizee_fitness_weights)
             weighted_fitness_list.append(weighted_fitness)
 
@@ -245,23 +286,33 @@ class GradientDescentOptimizer(Optimizer):
 
             # Explore the neighbourhood in the parameter space of the current individual
             new_individual_list = [
-                list_to_dict(self.current_individual + 
+                list_to_dict(self.current_individual +
                              self.random_state.normal(0.0, traj.exploration_step_size, self.current_individual.size),
                              self.optimizee_individual_dict_spec)
-                for _ in range(traj.n_random_steps)
+                for _ in range((traj.n_random_steps*traj.n_inner_params)-1)
             ]
             if self.optimizee_bounding_func is not None:
                 new_individual_list = [self.optimizee_bounding_func(ind) for ind in new_individual_list]
             new_individual_list.append(current_individual_dict)
 
+            new_individual_list_reform = self.compress_individual(new_individual_list, traj.n_inner_params)
+            #for s in range(len(new_individual_list)/traj.n_inner_params):
+            #    tmp = []
+            #    tmp_dict = {}
+            #    for key in self.grouped_params_dict.keys():
+            #        for p in range(traj.n_inner_params):
+            #            tmp.append(new_individual_list[s*traj.n_inner_params+p][key])
+            #        tmp_dict[key] = tmp
+            #    new_individual_list_reform.append(tmp_dict)
+            #print(new_individual_list_reform)
             fitnesses_results.clear()
-            self.eval_pop = new_individual_list
+            self.eval_pop = new_individual_list_reform
             self.g += 1  # Update generation counter
             self._expand_trajectory(traj)
 
     def end(self, traj):
         """
-        See :meth:`~l2l.optimizers.optimizer.Optimizer.end`
+        See :meth:`~ltl.optimizers.optimizer.Optimizer.end`
         """
         best_last_indiv_dict = list_to_dict(self.current_individual.tolist(),
                                             self.optimizee_individual_dict_spec)
@@ -277,7 +328,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Classic Gradient Descent specific initializiation.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory on which the parameters should get stored.
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory on which the parameters should get stored.
 
         :return:
         """
@@ -287,7 +338,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         RMSProp specific initializiation.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory on which the parameters should get stored.
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory on which the parameters should get stored.
 
         :return:
         """
@@ -304,7 +355,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         ADAM specific initializiation.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory on which the parameters should get stored.
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory on which the parameters should get stored.
 
         :return:
         """
@@ -324,7 +375,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Stochastic Gradient Descent specific initializiation.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory on which the parameters should get stored.
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory on which the parameters should get stored.
 
         :return:
         """
@@ -339,7 +390,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Updates the current individual using the classic Gradient Descent algorithm.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory which contains the parameters 
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory which contains the parameters 
             required by the update algorithm
 
         :param ~numpy.ndarray gradient: The gradient of the fitness curve, evaluated at the current individual
@@ -352,7 +403,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Updates the current individual using the RMSProp algorithm.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory which contains the parameters 
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory which contains the parameters 
             required by the update algorithm
 
         :param ~numpy.ndarray gradient: The gradient of the fitness curve, evaluated at the current individual
@@ -369,7 +420,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Updates the current individual using the ADAM algorithm.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory which contains the parameters 
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory which contains the parameters 
             required by the update algorithm
 
         :param ~numpy.ndarray gradient: The gradient of the fitness curve, evaluated at the current individual
@@ -391,7 +442,7 @@ class GradientDescentOptimizer(Optimizer):
         """
         Updates the current individual using a stochastic version of the gradient descent algorithm.
 
-        :param ~l2l.utils.trajectory.Trajectory traj: The  trajectory which contains the parameters 
+        :param ~pypet.trajectory.Trajectory traj: The :mod:'pypet' trajectory which contains the parameters 
             required by the update algorithm
 
         :param ~numpy.ndarray gradient: The gradient of the fitness curve, evaluated at the current individual
