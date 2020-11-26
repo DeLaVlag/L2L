@@ -12,24 +12,25 @@ from l2l.paths import Paths
 from l2l.optimizees.pse_multi.optimizee import PSEOptimizee
 
 import l2l.utils.JUBE_runner as jube
+from l2l.utils.experiment import Experiment
 
-warnings.filterwarnings("ignore")
+#warnings.filterwarnings("ignore")
 
-logger = logging.getLogger('ltl-pse-multi-gd')
+#logger = logging.getLogger('ltl-pse-multi-gd')
 
 
 def main():
     name = 'LTL-PSE-MULTI-GD'
-    try:
-        with open('bin/path.conf') as f:
-            root_dir_path = f.read().strip()
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            "You have not set the root path to store your results."
-            " Write the path to a path.conf text file in the bin directory"
-            " before running the simulation"
-        )
-    paths = Paths(name, dict(run_no='test'), root_dir_path=root_dir_path)
+    #try:
+    #    with open('bin/path.conf') as f:
+    #        root_dir_path = f.read().strip()
+    #except FileNotFoundError:
+    #    raise FileNotFoundError(
+    #        "You have not set the root path to store your results."
+    #        " Write the path to a path.conf text file in the bin directory"
+    #        " before running the simulation"
+    #    )
+    #paths = Paths(name, dict(run_no='test'), root_dir_path=root_dir_path)
 
     # with open("logging.yaml") as f:
     #     l_dict = yaml.load(f)
@@ -41,40 +42,47 @@ def main():
     # print("Change the values in logging.yaml to control log level and destination")
     # print("e.g. change the handler to console for the loggers you're interesting in to get output to stdout")
 
-    traj_file = os.path.join(paths.output_dir_path, 'data.h5')
+    #traj_file = os.path.join(paths.output_dir_path, 'data.h5')
 
     # Create an environment that handles running our simulation
     # This initializes a PyPet environment
-    env = Environment(trajectory=name, filename=traj_file, file_title='{} data'.format(name),
-                      comment='{} data'.format(name),
-                      add_time=True,
-                      freeze_input=True,
-                      multiproc=True,
-                      #use_scoop=True,
-                      automatic_storing=True,
-                      log_stdout=False,  # Sends stdout to logs
-                      log_folder=os.path.join(paths.output_dir_path, 'logs')
-                      )
+    #env = Environment(trajectory=name, filename=traj_file, file_title='{} data'.format(name),
+    #                  comment='{} data'.format(name),
+    #                  add_time=True,
+    #                  freeze_input=True,
+    #                  multiproc=True,
+    #                  #use_scoop=True,
+    #                  automatic_storing=True,
+    #                  log_stdout=False,  # Sends stdout to logs
+    #                  log_folder=os.path.join(paths.output_dir_path, 'logs')
+    #                  )
 
     # Get the trajectory from the environment
-    traj = env.trajectory
+    #traj = env.trajectory
 
     # Set JUBE params
-    traj.f_add_parameter_group("JUBE_params", "Contains JUBE parameters")
+    #traj.f_add_parameter_group("JUBE_params", "Contains JUBE parameters")
 
     # Scheduler parameters
     # The execution command
     # traj.f_add_parameter_to_group("JUBE_params", "exec", "mpirun -n 1 python3 " + root_dir_path +
     #                               "/run_files/run_optimizee.py")
 
-    traj.f_add_parameter_to_group("JUBE_params", "exec", "srun -n 1 -A slns python3 " + root_dir_path +
-                                  "/LTL-PSE-MULTI-GD/run-no-test/simulation/run_files/run_optimizee.py")
+    #traj.f_add_parameter_to_group("JUBE_params", "exec", "srun -n 1 -A slns python3 " + root_dir_path +
+                                  #"/LTL-PSE-MULTI-GD/run-no-test/simulation/run_files/run_optimizee.py")
     # Ready file for a generation
-    traj.f_add_parameter_to_group("JUBE_params", "ready_file", root_dir_path + "/readyfiles/ready_w_")
+    #traj.f_add_parameter_to_group("JUBE_params", "ready_file", root_dir_path + "/readyfiles/ready_w_")
     # Path where the job will be executed
-    traj.f_add_parameter_to_group("JUBE_params", "paths", paths)
+    #traj.f_add_parameter_to_group("JUBE_params", "paths", paths)
 
     # traj.f_add_parameter_to_group("JUBE_params", "A", 'slns')
+
+    # jube_params = {"exec": "srun -n 1 python3"}
+    jube_params={}
+
+    experiment = Experiment(root_dir_path='../results')
+
+    traj, _ = experiment.prepare_experiment(jube_parameter=jube_params, name=name, log_stdout=True)
 
     # NOTE: Innerloop simulator
     optimizee = PSEOptimizee(traj, seed=0)
@@ -91,20 +99,23 @@ def main():
                                          parameters=parameters,
                                          optimizee_bounding_func=optimizee.bounding_func)
 
+    experiment.run_experiment(optimizee=optimizee, optimizee_parameters=None, optimizer=optimizer, optimizer_parameters=parameters) 
+    experiment.end_experiment(optimizer)
+
     # Prepare optimizee for jube runs
-    jube.prepare_optimizee(optimizee, root_dir_path)
+    #jube.prepare_optimizee(optimizee, root_dir_path)
 
     # Add post processing
-    env.add_postprocessing(optimizer.post_process)
+    #env.add_postprocessing(optimizer.post_process)
 
     # Run the simulation with all parameter combinations
-    env.run(optimizee.simulate)
+    #env.run(optimizee.simulate)
 
     # NOTE: Outerloop optimizer end
-    optimizer.end(traj)
+    #optimizer.end(traj)
 
     # Finally disable logging and close all log-files
-    env.disable_logging()
+    #env.disable_logging()
 
 
 if __name__ == '__main__':

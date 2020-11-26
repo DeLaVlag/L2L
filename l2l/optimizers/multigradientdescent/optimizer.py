@@ -209,6 +209,7 @@ class MultiGradientDescentOptimizer(Optimizer):
         """
         See :meth:`~ltl.optimizers.optimizer.Optimizer.post_process`
         """
+        print('g counter:', self.g)
         old_eval_pop = self.eval_pop.copy()
         old_eval_pop_expanded = self.expand_individual(old_eval_pop,traj.n_inner_params)
         self.eval_pop.clear()
