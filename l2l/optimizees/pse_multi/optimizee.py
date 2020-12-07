@@ -8,6 +8,7 @@ import subprocess
 
 logger = logging.getLogger("ltl-pse")
 
+# class SubmitJob(gc3libs.Application)
 
 class PSEOptimizee(Optimizee):
 
@@ -24,15 +25,24 @@ class PSEOptimizee(Optimizee):
         self.coupling = trajectory.individual.coupling
 
         # Do nothing
-        proc = subprocess.Popen(['/p/project/cslns/wikicollab/RateML/runthingsJuwels', 'kuramoto', '32', '32'])
-        proc.wait()
+        # proc = subprocess.run(['/p/project/cslns/wikicollab/RateML/runthingsJuwels', 'kuramoto', '32', '32'])
+        # proc = subprocess.Popen(['python3', '/p/project/cslns/wikicollab/RateML/__main__.py', '--model', 'kuramoto',
+        #                        '-c32', '-s32', '-n40', '-tvbn', '68', '-stts', '1'])
+        # proc.wait()
 
+        try:
+            subprocess.run(['python3', '/p/project/cslns/wikicollab/RateML/__main__.py', '--model', 'kuramoto',
+                                   '-c32', '-s32', '-n40', '-tvbn', '68', '-stts', '1'], check=True)
+        except subprocess.CalledProcessError:
+            logger.error('Optimizee process error')
+        
+        
         # Result was dumped to file Result.txt
         self.fitness = []
         if id == 0:
-            filename = "/home/sandra/Documents/inm7/Result_0.txt"
+            filename = "/p/project/cslns/vandervlag1/L2L/results/Result_0.txt"
         else:
-            filename = "/home/sandra/Documents/inm7/Result_1.txt"
+            filename = "/p/project/cslns/vandervlag1/L2L/results/Result_1.txt"
         with open(filename, "r") as f:
             line = f.readline()
             while line:
