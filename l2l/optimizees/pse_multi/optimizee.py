@@ -1,10 +1,11 @@
 import logging
 
-import numpy
+import numpy as np
 from sdict import sdict
 
 from l2l.optimizees.optimizee import Optimizee
 import subprocess
+import pickle
 
 logger = logging.getLogger("ltl-pse")
 
@@ -16,38 +17,47 @@ class PSEOptimizee(Optimizee):
 
         super(PSEOptimizee, self).__init__(trajectory)
         # If needed
-        seed = numpy.uint32(seed)
-        self.random_state = numpy.random.RandomState(seed=seed)
+        seed = np.uint32(seed)
+        self.random_state = np.random.RandomState(seed=seed)
 
     def simulate(self, trajectory):
         self.id = trajectory.individual.ind_idx
         self.delay = trajectory.individual.delay
         self.coupling = trajectory.individual.coupling
 
-        # Do nothing
-        # proc = subprocess.run(['/p/project/cslns/wikicollab/RateML/runthingsJuwels', 'kuramoto', '32', '32'])
-        # proc = subprocess.Popen(['python3', '/p/project/cslns/wikicollab/RateML/__main__.py', '--model', 'kuramoto',
-        #                        '-c32', '-s32', '-n40', '-tvbn', '68', '-stts', '1'])
-        # proc.wait()
+        # Pickle the L2L produced parameters such that your application can pick them up
+        coup_file = open('/p/project/cslns/wikicollab/Parsweep_L2L_RateML/couplings_%d' % self.id, 'wb')
+        dela_file = open('/p/project/cslns/wikicollab/Parsweep_L2L_RateML/speeds_%d' % self.id, 'wb')
+        pickle.dump(self.coupling, coup_file)
+        pickle.dump(self.delay, dela_file)
+        coup_file.close()
+        dela_file.close()
 
+        # Start the to optimize process which can be any executable
+        # Make sure to read in the pickled data from L2L
+        # TODO: make nicer
         try:
-            subprocess.run(['python3', '/p/project/cslns/wikicollab/RateML/__main__.py', '--model', 'kuramoto',
-                                   '-c32', '-s32', '-n40', '-tvbn', '68', '-stts', '1'], check=True)
+            subprocess.run(['python3', '/p/project/cslns/wikicollab/Parsweep_L2L_RateML/parsweep.py', '--model', 'kuramoto',
+                                   '-c32', '-s32', '-n4', '--tvbn', '68', '--stts', '1', '--procid', str(self.id)], check=True)
         except subprocess.CalledProcessError:
             logger.error('Optimizee process error')
-        
-        
-        # Result was dumped to file Result.txt
+
+        # Results are dumped to file result_[self.id].txt. Unpickle them here
         self.fitness = []
-        if id == 0:
-            filename = "/p/project/cslns/vandervlag1/L2L/results/Result_0.txt"
-        else:
-            filename = "/p/project/cslns/vandervlag1/L2L/results/Result_1.txt"
-        with open(filename, "r") as f:
-            line = f.readline()
-            while line:
-                self.fitness.extend([line])
-                line = f.readline()
+        cuda_RateML_res_file = open('/p/project/cslns/vandervlag1/L2L/results/result_%d' % self.id, 'rb')
+        self.fitness = pickle.load(cuda_RateML_res_file)
+        cuda_RateML_res_file.close()
+
+        # self.fitness = []
+        # if id == 0:
+        #     filename = "/p/project/cslns/vandervlag1/L2L/results/Result_0.txt"
+        # else:
+        #     filename = "/p/project/cslns/vandervlag1/L2L/results/Result_1.txt"
+        # with open(filename, "r") as f:
+        #     line = f.readline()
+        #     while line:
+        #         self.fitness.extend([line])
+        #         line = f.readline()
 
         return self.fitness
 
@@ -56,25 +66,28 @@ class PSEOptimizee(Optimizee):
         Creates a random value of parameter within given bounds
         """
         # Define the first solution candidate randomly
-        self.bound_gr = [0, 0]  # for delay
-        self.bound_gr[0] = 0
-        self.bound_gr[1] = 94
-
-        self.bound_gr2 = [0, 0]  # for coupling
-        self.bound_gr2[0] = 0
-        self.bound_gr2[1] = 0.945
+        # self.bound_gr = [0, 0]  # for delay
+        # self.bound_gr[0] = 0
+        # self.bound_gr[1] = 94
+        #
+        # self.bound_gr2 = [0, 0]  # for coupling
+        # self.bound_gr2[0] = 0
+        # self.bound_gr2[1] = 0.945
 
         num_of_parameters = 1  # 48
         # return{'coupling':[5,6,7,8,9], 'delay':[0.1,1,10,12]}
-        delay_array = []
-        coupling_array = []
-        for i in range(num_of_parameters):
-            delay_array.extend([self.random_state.rand() * (self.bound_gr[1] - self.bound_gr[0]) + self.bound_gr[0]])
-            coupling_array.extend(
-                [self.random_state.rand() * (self.bound_gr2[1] - self.bound_gr2[0]) + self.bound_gr2[0]])
+        # delay_array = []
+        # coupling_array = []
+        # for i in range(num_of_parameters):
+        #     delay_array.extend([self.random_state.rand() * (self.bound_gr[1] - self.bound_gr[0]) + self.bound_gr[0]])
+        #     coupling_array.extend(
+        #         [self.random_state.rand() * (self.bound_gr2[1] - self.bound_gr2[0]) + self.bound_gr2[0]])
 
-        print(delay_array)
-        print(coupling_array)
+        coupling_array = np.linspace(0.003, 0.005, num_of_parameters)
+        delay_array = np.linspace(3.0, 5.0, num_of_parameters)
+
+        # print(delay_array)
+        # print(coupling_array)
         return {'delay': delay_array, 'coupling': coupling_array}
         # return {'delay': self.random_state.rand() * (self.bound_gr[1] - self.bound_gr[0]) + self.bound_gr[0],
         #      'coupling': self.random_state.rand() * (self.bound_gr2[1] - self.bound_gr2[0]) + self.bound_gr2[0]}

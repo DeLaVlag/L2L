@@ -158,7 +158,7 @@ class MultiGradientDescentOptimizer(Optimizer):
                          self.optimizee_individual_dict_spec)
             for i in range((parameters.n_random_steps*traj.n_inner_params)-1)
         ]
-        print(new_individual_list)
+        # print(new_individual_list)
 
         # Also add the current individual to determine it's fitness
         new_individual_list.append(list_to_dict(self.current_individual, self.optimizee_individual_dict_spec))
@@ -189,7 +189,7 @@ class MultiGradientDescentOptimizer(Optimizer):
                 parameters = elem[key]
                 for ix, e in enumerate(parameters):
                     individual_exp[ind_id*inner_params+ix][key] = float(e)
-        print(individual_exp)
+        # print(individual_exp)
         return individual_exp
 
     def compress_individual(self, e_population, inner_params):
@@ -202,14 +202,14 @@ class MultiGradientDescentOptimizer(Optimizer):
                    tmp.append(e_population[s*inner_params + p][key])
                tmp_dict[key] = tmp
            e_population_reform.append(tmp_dict)
-        print(e_population_reform)
+        # print(e_population_reform)
         return e_population_reform
 
     def post_process(self, traj, fitnesses_results):
         """
         See :meth:`~ltl.optimizers.optimizer.Optimizer.post_process`
         """
-        print('g counter:', self.g)
+        # print('g counter:', self.g)
         old_eval_pop = self.eval_pop.copy()
         old_eval_pop_expanded = self.expand_individual(old_eval_pop,traj.n_inner_params)
         self.eval_pop.clear()
@@ -226,7 +226,7 @@ class MultiGradientDescentOptimizer(Optimizer):
         for (id, elem) in fitnesses_results:
             for ix, e in enumerate(elem):
                 fitnesses_results_exp.append((ix, float(e)))
-        print(fitnesses_results_exp)
+        # print(fitnesses_results_exp)
         for i, (run_index, fitness) in enumerate(fitnesses_results_exp):
             # We need to convert the current run index into an ind_idx
             # (index of individual within one generation
@@ -236,7 +236,7 @@ class MultiGradientDescentOptimizer(Optimizer):
             individual = old_eval_pop_expanded[i]
             traj.f_add_result('$set.$.individual', individual)
             traj.f_add_result('$set.$.fitness', fitness)
-            print(fitness)
+            # print(fitness)
             weighted_fitness = np.dot(fitness, self.optimizee_fitness_weights)
             weighted_fitness_list.append(weighted_fitness)
 

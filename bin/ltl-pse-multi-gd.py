@@ -92,10 +92,10 @@ def main():
     # TODO: Change the optimizer to the appropriate Optimizer class
     parameters = MultiRMSPropParameters(learning_rate=0.005, exploration_step_size=0.01,
                                    n_random_steps=2, momentum_decay=0.005,
-                                   n_iteration=100, stop_criterion=np.Inf, seed=99, n_inner_params=16)
+                                   n_iteration=2, stop_criterion=np.Inf, seed=99, n_inner_params=2)
 
     optimizer = MultiGradientDescentOptimizer(traj, optimizee_create_individual=optimizee.create_individual,
-                                         optimizee_fitness_weights=(0.1,),
+                                         optimizee_fitness_weights=(1,),
                                          parameters=parameters,
                                          optimizee_bounding_func=optimizee.bounding_func)
 
