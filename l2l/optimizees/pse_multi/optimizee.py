@@ -35,9 +35,10 @@ class PSEOptimizee(Optimizee):
 
         # Start the to optimize process which can be any executable
         # Make sure to read in the pickled data from L2L
+        # Set the rateML execution and results folder on your system
         # TODO: make nicer
         try:
-            subprocess.run(['python', '/p/project/cslns/wikicollab/Parsweep_L2L_RateML/parsweep.py',
+            subprocess.run(['python', 'rateML/parsweep.py',
                             '--model', 'oscillator',
                             '-c32', '-s32', '-n400',
                             '--tvbn', '76', '--stts', '2',
@@ -47,11 +48,9 @@ class PSEOptimizee(Optimizee):
 
         # Results are dumped to file result_[self.id].txt. Unpickle them here
         self.fitness = []
-        cuda_RateML_res_file = open('/p/project/cslns/vandervlag1/L2L/results/result_%d' % self.id, 'rb')
+        cuda_RateML_res_file = open('rateML/result_%d' % self.id, 'rb')
         self.fitness = pickle.load(cuda_RateML_res_file)
         cuda_RateML_res_file.close()
-
-        print('FITNESS!!!', self.fitness)
 
         # self.fitness = []
         # if id == 0:
