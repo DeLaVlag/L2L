@@ -124,14 +124,19 @@ class MultiGradientDescentOptimizer(Optimizer):
         traj.f_add_parameter('n_inner_params', parameters.n_inner_params, comment='Number of parameters internally explored per individual')
         traj.f_add_parameter('stop_criterion', parameters.stop_criterion, comment='Stopping criterion parameter')
         traj.f_add_parameter('seed', np.uint32(parameters.seed), comment='Optimizer random seed')
-        
+
         _, self.optimizee_individual_dict_spec = dict_to_list(self.optimizee_create_individual(), get_dict_spec=True)
         self.random_state = np.random.RandomState(seed=traj.par.seed)
 
         # Note that this array stores individuals as an np.array of floats as opposed to Individual-Dicts
         # This is because this array is used within the context of the gradient descent algorithm and
         # Thus needs to handle the optimizee individuals as vectors
-        self.current_individual = np.array(dict_to_list(self.optimizee_create_individual()))
+        # Attempt with homogeneous distribution of points in space.
+        # Multigradient descent starts with a homogeneous distribution of all parameters in space.
+        # individual_dicts = self.optimizee_create_individual() # [{delay: a1, coupling: b1}, {delay: a1, coupling: b2},...]
+
+        self.current_individual = np.array(
+            dict_to_list(self.optimizee_create_individual()))  # [one random sample]
 
         # Depending on the algorithm used, initialize the necessary variables
         self.updateFunction = None
@@ -173,6 +178,8 @@ class MultiGradientDescentOptimizer(Optimizer):
         self.g = 0
         new_individual_list = self.compress_individual(new_individual_list, traj.n_inner_params)
         self.eval_pop = new_individual_list
+        # print('evalpop', self.eval_pop)
+        print('traj', traj)
         self._expand_trajectory(traj)
 
     def get_params(self):

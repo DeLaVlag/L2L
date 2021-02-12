@@ -37,8 +37,11 @@ class PSEOptimizee(Optimizee):
         # Make sure to read in the pickled data from L2L
         # TODO: make nicer
         try:
-            subprocess.run(['python3', '/p/project/cslns/wikicollab/Parsweep_L2L_RateML/parsweep.py', '--model', 'kuramoto',
-                                   '-c32', '-s32', '-n4', '--tvbn', '68', '--stts', '1', '--procid', str(self.id)], check=True)
+            subprocess.run(['python', '/p/project/cslns/wikicollab/Parsweep_L2L_RateML/parsweep.py',
+                            '--model', 'oscillator',
+                            '-c32', '-s32', '-n400',
+                            '--tvbn', '76', '--stts', '2',
+                            '--procid', str(self.id)], check=True)
         except subprocess.CalledProcessError:
             logger.error('Optimizee process error')
 
@@ -47,6 +50,8 @@ class PSEOptimizee(Optimizee):
         cuda_RateML_res_file = open('/p/project/cslns/vandervlag1/L2L/results/result_%d' % self.id, 'rb')
         self.fitness = pickle.load(cuda_RateML_res_file)
         cuda_RateML_res_file.close()
+
+        print('FITNESS!!!', self.fitness)
 
         # self.fitness = []
         # if id == 0:
@@ -74,7 +79,7 @@ class PSEOptimizee(Optimizee):
         # self.bound_gr2[0] = 0
         # self.bound_gr2[1] = 0.945
 
-        num_of_parameters = 1  # 48
+        # num_of_parameters = 32  # 48
         # return{'coupling':[5,6,7,8,9], 'delay':[0.1,1,10,12]}
         # delay_array = []
         # coupling_array = []
@@ -83,14 +88,15 @@ class PSEOptimizee(Optimizee):
         #     coupling_array.extend(
         #         [self.random_state.rand() * (self.bound_gr2[1] - self.bound_gr2[0]) + self.bound_gr2[0]])
 
-        coupling_array = np.linspace(0.003, 0.005, num_of_parameters)
-        delay_array = np.linspace(3.0, 5.0, num_of_parameters)
+        # coupling_array = np.linspace(0.003, 0.005, num_of_parameters)
+        # delay_array = np.linspace(3.0, 5.0, num_of_parameters)
 
         # print(delay_array)
         # print(coupling_array)
-        return {'delay': delay_array, 'coupling': coupling_array}
+        # return {'delay': delay_array, 'coupling': coupling_array}
         # return {'delay': self.random_state.rand() * (self.bound_gr[1] - self.bound_gr[0]) + self.bound_gr[0],
         #      'coupling': self.random_state.rand() * (self.bound_gr2[1] - self.bound_gr2[0]) + self.bound_gr2[0]}
+        return {'delay': (np.random.rand()*(5.0-3.0))+3.0, 'coupling': (np.random.rand()*(0.005-0.004))+0.004}
 
     def bounding_func(self, individual):
         return individual
